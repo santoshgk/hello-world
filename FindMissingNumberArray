@@ -1,0 +1,180 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+namespace ConsoleApplication1
+{
+    //A zero-indexed array A consisting of N different integers is given. 
+    //    The array contains integers in the range [1..(N + 1)], which means that exactly one element is missing.
+
+    //Your goal is to find that missing element.
+
+    //Write a function:
+
+    //class Solution { public int solution(int[] A); }
+    //that, given a zero-indexed array A, returns the value of the missing element.
+
+    //For example, given array A such that:
+
+    //A[0] = 2 A[1] = 3 A[2] = 1 A[3] = 5
+    //the function should return 4, as it is the missing element.
+
+    //Assume that:
+
+    //N is an integer within the range [0..100,000]; the elements of A are all distinct; 
+    //    each element of array A is an integer within the range [1..(N + 1)].
+    //Case A 1,2,3,5,6,7
+    //Case B 1,2,3,4,5,6
+    class FindMissingArraySequence
+    {
+        public static void Main()
+        {
+            int[] A = { 12, 15, 11, 13, 15, 16 };
+            Array.Sort(A);
+
+            Console.WriteLine("input is ");
+            for(int j=0; j<A.Length; j++)
+                Console.WriteLine(A[j] + " " );
+    
+            int key = A[0] + ((A.Length / 2) -1);
+
+            var x = BinarySearchRecursive(A, key, 0, A.Length-1);
+            Console.ReadLine();
+        }
+
+        public static bool BinarySearchRecursive(int[] inputArray, int key, int min, int max)
+        {
+            if (min > max)
+            {
+                Console.WriteLine("The sequence is not OK");
+                return false;
+            }
+            else
+            {
+                int mid = (min + max) / 2;
+                if (Math.Abs(mid - max) == 1.0M)
+                {
+                    return Result(inputArray, max, mid);
+                }
+                else if (key == inputArray[mid]) //left half of array is OK.
+                {
+                    min = mid;
+                    mid = min + (min ==1? 1 : min/2); //move to right half.
+                    if (mid > inputArray.Length - 1)
+                        mid = inputArray.Length - 1;
+
+                    key = inputArray[0] + mid;
+
+                    if (mid == max)
+                    {
+                        return result2(inputArray, key, mid);
+                    }
+                    else 
+                    {
+                        return BinarySearchRecursive(inputArray, key, min, max);
+                    }
+                }
+                else if (key < inputArray[mid])
+                {
+                    max = mid;
+                    mid = (min + max) / 2; //move to left half.
+                    key = inputArray[0] + mid;
+                    if (mid > max)
+                    {
+                        Console.WriteLine("All elelments ok 2");
+                        return true;
+                    }
+                    else if (mid == max)
+                    {
+                        return result3(inputArray, key, mid);
+                    }
+                    else
+                    {
+                        return BinarySearchRecursive(inputArray, key, min, max);
+                        //BinarySearchRecursive(inputArray, key, min, mid - 1);
+                    }                     
+                }
+                else
+                {
+                    min = mid;
+                    mid = (min + max) / 2; //move to right half.
+                    key = inputArray[0] + mid;
+                    if (mid > max)
+                    {
+                        Console.WriteLine("All elelments ok 3");
+                        return true;
+                    }
+                    else if (mid <= max)
+                    {
+
+                        return result5(inputArray, key, mid);
+                    }
+                    else
+                    {
+                        return BinarySearchRecursive(inputArray, key, min, max);
+                    }                    
+                }
+            }
+        }
+
+        private static bool result5(int[] inputArray, int key, int mid)
+        {
+            if (inputArray[mid] == key)
+            {
+                Console.WriteLine("All elelments ok 3");
+                return true;
+            }
+            else
+            {
+                Console.WriteLine("Missing element at {0} is {1}", mid, inputArray[0] + mid);
+                return false;
+            }
+        }
+
+        private static bool result3(int[] inputArray, int key, int mid)
+        {
+            if (inputArray[mid] == key)
+            {
+                Console.WriteLine("All elelments ok 2");
+                return true;
+            }
+            else
+            {
+                Console.WriteLine("Missing element at {0} is {1}", mid, inputArray[0] + mid);
+                return false;
+            }
+        }
+
+        private static bool result2(int[] inputArray, int key, int mid)
+        {
+            if (inputArray[mid] == key)
+            {
+                Console.WriteLine("All elelments ok 1");
+                return true;
+            }
+            else
+            {
+                Console.WriteLine("Missing element at {0} is {1}", mid, inputArray[0] + mid);
+                return false;
+            }
+        }
+
+        private static bool Result(int[] inputArray, int max, int mid)
+        {
+            if (inputArray[mid] != inputArray[0] + mid)
+            {
+                Console.WriteLine("Missing element at {0} is {1}", mid, inputArray[0] + mid);
+                return false;
+            }
+            else if (inputArray[max] != inputArray[0] + max)
+            {
+                Console.WriteLine("Missing element at {0} is {1}", mid, inputArray[0] + max);
+                return false;
+            }
+
+            Console.WriteLine("The sequence has all elements.");
+            return true;
+        }
+    }
+}
