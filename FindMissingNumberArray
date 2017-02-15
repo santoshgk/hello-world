@@ -178,3 +178,351 @@ namespace ConsoleApplication1
         }
     }
 }
+
+Let’s define a problem relating to maximum slices. You are given a sequence of n integers
+a0, a1, . . . ,an≠1 and the task is to find the slice with the largest sum. More precisely, we are
+looking for two indices p, q such that the total ap + ap+1 + . . . + aq is maximal. We assume
+that the slice can be empty and its sum equals 0.
+a0 a1 a2 a3 a4 a5 a6
+5 -7 3 5 -2 4 -1
+In the picture, the slice with the largest sum is highlighted in gray. The sum of this slice
+equals 10 and there is no slice with a larger sum. Notice that the slice we are looking for may
+contain negative integers, as shown above.
+
+    class msx_slice
+    {
+        static void Main(string[] args)
+        {
+            int[] A = { 5, -7, 3, 5, -2, 4, -1 };
+            golden_max_slice(A);
+        }
+
+        private static void golden_max_slice(int[] A)
+        {
+            int max_ending = 0;
+            int max_slice = 0;
+            int temp = 0;
+
+            for (int i = 0; i < A.Length; i++)
+            {
+                temp = max_ending + A[i];
+                max_ending = temp > 0 ? temp : 0;
+
+                max_slice = max_slice > max_ending ? max_slice : max_ending;
+            }
+
+            Console.WriteLine(max_slice);
+            Console.ReadLine();
+        }
+    }
+    
+ {
+    "PATH": "D:\\xyzIRHM\\abcWorking\\defData\\ghDeal\\",
+    "CONNECTION": {
+        "DATABASE": "xyz_Working",
+        "DRIVER": "{SQL Server Native Client 10.0}",
+        "SERVER": "xx.xx.xxx.xxx",
+        "TRUSTED_CONNECTION": "Yes"
+    },
+    "OPTIONS": [
+        {
+            "ExtraField": {
+                "batch_date": "BusinessDate"
+            },
+            "Database": "xyzArchive",
+            "PurgeFirst": true,
+            "Group": "DEAL",
+            "FileNameBeginWith": [
+                "abcDeal-"
+            ]
+        }
+    ],
+    "TIMEOUT": 600
+}
+#-------------------------------------------------------------------------------
+# Name:        ixrxhxyx_xdyby_yiymypyoyryty.ypy
+# Purpose:     Import IyRyHyyyryiydy data in JSON format into IyRyHyybyryiydPyLy and MyiynyiyVyayRy DB
+
+#-------------------------------------------------------------------------------
+
+import pyodbc
+import traceback
+#import datetime
+import glob
+import time
+import sys
+import decimal
+
+try:
+    import simplejson as json
+except ImportError:
+    import json
+
+
+_lookup = {}
+
+
+def print_strace():
+    print("-"*80)
+    traceback.print_exc(file=sys.stdout)
+    print("-"*80)
+    
+    
+#def datetime_decoder(d):
+#    if isinstance(d, list):
+#        pairs = enumerate(d)
+#    elif isinstance(d, dict):
+#        pairs = d.items()
+#    result = []
+#    for k,v in pairs:
+#        if isinstance(v, basestring):
+#            try:
+#                v = datetime.datetime.strptime(v, '%Y-%m-%dT%H:%M:%S.%f')
+#            except ValueError:
+#                try:
+#                    v = datetime.datetime.strptime(v, '%Y-%m-%dT%H:%M:%S')
+#                except ValueError:
+#                    try:
+#                        v = datetime.datetime.strptime(v, '%Y-%m-%d').date()
+#                    except ValueError:
+#                        pass
+#        elif isinstance(v, (dict, list)):
+#            v = datetime_decoder(v)
+#        result.append((k, v))
+#    if isinstance(d, list):
+#        return [x[1] for x in result]
+#    elif isinstance(d, dict):
+#        return dict(result)
+
+
+def purgeTable(cur, db, table, flt, ext, obj):
+    '''
+    Delete deal related tables
+    '''
+    # FixingNResult is NOT on cascade deletion
+    if table.lower() == 'deal':
+        fulltablename = [ '{}.dbo.{}'.format(db, tbl) for tbl in ('deal', 'fixingnresult')]
+    else:
+        fulltablename = [ '{}.dbo.{}'.format(db, table) ]
+
+    where = ''
+    if (flt):
+        where = ' WHERE ' + flt
+        if (ext):
+            where += ' AND ' + ' AND '.join([('{0}=\'' + '{1}\'').format(k, obj[v]) for k,v in ext.items()])
+
+    sqls = [ 'DELETE FROM ' + tbl + where for tbl in fulltablename ]
+    #print '---', sqls
+    [ cur.execute(sql) for sql in sqls ]
+    cur.commit()
+
+
+def getGroupName(tblname):
+    '''
+    Get the group that the table is associate with
+    '''
+    for opt in _lookup['OPTIONS']:
+        if tblname in (name.lower() for name in opt['FileNameBeginWith']):
+            return opt['Group']
+
+
+def insertToDB(cur, obj, db, ext=None):
+    '''
+    Perform table insertion or update based on given obj contents
+    '''
+    for (key, contents) in obj.items():
+        tblname = key
+
+        rowcount = len(contents)
+
+        if ext:
+            for k, v in ext.items():
+                contents[0].insert(0, k)
+                [ contents[i].insert(0, v) for i in xrange(1, rowcount) ]
+
+        if (tblname.lower() == 'cdsheader' or tblname.lower() == 'cdsvalue'):
+            # cannot insert explicit value for identity column in table
+            # when IDENTITY_INSERT is set to OFF.
+            try:
+                idx = contents[0].index('uniqueid')
+                for i in xrange(0, rowcount):
+                    del contents[i][idx]
+            except:
+                raise RuntimeError('Fail to remove uniqueid field from {} data before insertion! {} {}'.format(tblname, sys.exc_info()[0], sys.exc_info()[1]))
+
+        fulltablename = db + '.dbo.' + tblname
+        colcount = len(contents[0])
+
+        if getGroupName(tblname) in ['HEADER']:
+            '''
+            insert record by record, if fail for specific record, update it
+            '''
+            columns = [ item.column_name.lower() for item in cur.columns(table=tblname)]
+            pk = [ item.column_name.lower() for item in cur.primaryKeys(table=tblname) ]
+            nonepk = [ x for x in columns if x not in set(pk) ]
+
+            pk_idx = [ contents[0].index(v) for v in pk ]
+            nonepk_idx = [ contents[0].index(v) for v in nonepk ]
+
+            sql = 'INSERT INTO ' + fulltablename + ' (' + ','.join(contents[0]) + ') VALUES (' + ','.join('?'*colcount) + ')'
+            sql2 = 'UPDATE ' + fulltablename + ' SET '  + '=?, '.join(nonepk) + '=? WHERE ' + '=? AND '.join(pk) + '=?'
+
+            for i in xrange(1, rowcount):
+                row = contents[i]
+                try:
+                    arg = tuple(row)
+                    #print '<<<', sql, arg
+                    cur.execute(sql, arg)
+                except:
+                    try:
+                        arg2 = tuple([ row[j] for j in nonepk_idx ] + [ row[j] for j in pk_idx ])
+                        #print '>>>', sql2, arg2
+                        cur.execute(sql2, arg2)
+                    except:
+                        raise RuntimeError('Fail to update table {} with {}th record in {}.json. {} {}'.format(fulltablename, str(i), tblname, sys.exc_info()[0], sys.exc_info()[1]))
+
+            cur.commit()
+
+        else:
+            '''
+            Insert directly as target entry should have been deleted up front
+            '''
+            sql = 'INSERT INTO ' + fulltablename + ' (' + ','.join(contents[0]) + ') VALUES (' + ','.join('?'*colcount) + ')'
+            #print '###', sql
+            cur.executemany(sql, contents[1:])
+            cur.commit()
+
+def main():
+    '''
+    Load configuration file, follow option list in configuration file to import json into database
+    '''
+
+    global _lookup
+
+    try:
+        try:
+            if len(sys.argv) == 2:
+                config = sys.argv[0].split('.')[0] + sys.argv[1] + '.config'
+            else:
+                config = sys.argv[0].split('.')[0] + '.config'
+            with open(config, 'r') as f:
+                _lookup = json.load(f)
+        except:
+            raise RuntimeError('Fail to load configuration file! Please ensure configuration file {} is present and readable.'.format(config))
+
+        constr =  ';'.join(['{0}={1}'.format(k, v) for k,v in _lookup['CONNECTION'].items()])
+        path, timeout = _lookup['PATH'], _lookup['TIMEOUT']
+    
+        with pyodbc.connect(constr, timeout=30) as con:
+            con.timeout = timeout
+            with con.cursor() as cur:
+    
+                reftime = time.time()
+                options = _lookup['OPTIONS']
+                print 'server  :', _lookup['CONNECTION']['SERVER']
+                print 'path    :', path
+    
+                for opt in options:
+                    db, purge = opt['Database'], opt['PurgeFirst']
+                    ext = opt.get('ExtraField')
+                    for filename in (name.lower() for name in opt['FileNameBeginWith']):
+                        #print filename
+                        if filename.lower() == 'deal-':
+                            abslocation = path + filename.lower() + '*.json'
+                        else:
+                            abslocation = path + filename.lower() + '.json'
+                        for entry in glob.glob(abslocation):
+
+                            start_time = time.time()
+                            print 'importing', entry, '.' * (76-len(entry)),
+                            with open(entry, 'r') as inputfile:
+                                #obj = json.load(inputfile, object_hook=datetime_decoder)
+                                obj = json.load(inputfile, parse_float=decimal.Decimal)
+
+                                tic1 =  time.time()
+                                elapsed_time = tic1 - start_time
+                                print '%8.3f' % (elapsed_time),
+
+                                table, flt = obj['Table'], obj['Filter']
+
+                                # precondition for successful insertion
+                                if (purge):
+                                    purgeTable(cur, db, table, flt, ext, obj)
+
+                                tic2 = time.time()
+                                elapsed_time = tic2 - tic1
+                                print '%8.3f' % (elapsed_time),
+
+                                extra = {}
+                                if ext:
+                                    for k, v in ext.items():
+                                        extra[k] = obj[v]
+
+                                [ insertToDB(cur, o, db, extra) for o in obj['Details'] ]
+
+                                tic3 = time.time()
+                                elapsed_time = tic3 - tic2
+                                print '%8.3f' % (elapsed_time),
+
+                            elapsed_time = time.time() - start_time
+                            print '%8.3f (s)' % (elapsed_time)
+
+                elapsed_time = time.time() - reftime
+                print 'All done in %8.3f (s)' % (elapsed_time)
+    
+    except:
+        print "Exception:", sys.exc_info()[0], sys.exc_info()[1]
+        print_strace()
+        sys.exit(-1)
+        
+        
+if __name__ == '__main__':
+    main()
+    //Return the number of integers within the range [A..B] that are divisible by K.
+    //Args: - A: is an integer within the range [0..2,000,000,000] - 
+    //B: is an integer within the range [0..2,000,000,000] and A <= B - 
+    //K: is an integer within the range [1..2,000,000,000]
+
+    class ReturnNumberOfIntegersInArange
+    {
+        public static void Main_RetInt()
+        {
+            string tocontinue= "y";
+            do
+            {
+                ComputeTheCount();
+                Console.WriteLine("Continue? (y/n)");
+                tocontinue = Console.ReadLine();
+
+            } while (tocontinue == "y");
+        }
+
+        private static void ComputeTheCount()
+        {
+            Console.WriteLine("Enter the number A for division - (1..2,000,000,000)");
+            string A = Console.ReadLine();
+            Console.WriteLine("Enter the number B for division - (1..2,000,000,000)");
+            string B = Console.ReadLine();
+            Console.WriteLine("Enter the number K for division - (1..2,000,000,000)");
+            string K = Console.ReadLine();
+
+            printCountDivisibleNumbers(Convert.ToInt32(A), Convert.ToInt32(B), Convert.ToInt32(K));
+        }
+
+        private static void printCountDivisibleNumbers(int A, int B, int K)
+        {
+            if (A < 0 || B < 0 || K < 1)
+            {
+                Console.WriteLine("Invalid inputs {0}, {1}, {2}", A, B, K);
+                Console.WriteLine("exiting.. ");
+                return;
+            }
+            int lowerBound = A==0? 0 : (A % K) == 0 ? 1: 0;
+            int first = B / K;
+            int second = A / K;
+            int diff = first - second;
+
+            Console.WriteLine("The count for {0} is {1} ", K, diff + lowerBound);
+        }
+    }
+
